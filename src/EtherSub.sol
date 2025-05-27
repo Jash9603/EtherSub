@@ -1,3 +1,4 @@
+
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.18;
 
@@ -44,12 +45,24 @@ contract EtherSub {
     struct Plan {
         string name;
         uint256 amountPerMonth; // stored in USD with 18 decimals
+        string[] allowedFeatures; // JSON string of allowed features
     }
+
+    struct Feature {
+        string featureId; // Unique identifier for the feature
+        string name;
+        string description;
+    }
+
 
     // ===== Mappings & Arrays =====
     mapping(string => Plan) public plans;
     string[] public planNames;
     mapping(address => mapping(string => Subscription)) public subscriptions;
+
+    mapping(string => Feature) public features; // Mapping of feature IDs to Feature structs
+    string[] public featureIds; // Array of feature IDs for iteration
+
 
     // ===== Constructor =====
     constructor() {
@@ -70,32 +83,66 @@ contract EtherSub {
         return (usdAmount * 1e18) / (ethPrice * 1e10);
     }
 
+    //only owner can create features
+    function createFeature(string memory featureId, string memory name, string memory description) public onlyOwner {
+        require(bytes(features[featureId].featureId).length == 0, "Feature already exists");
+        features[featureId] = Feature(featureId, name, description);
+        featureIds.push(featureId);
+    }
+
+    //view all features
+    function viewFeatures() public view returns (Feature[] memory) {
+        Feature[] memory allFeatures = new Feature[](featureIds.length);
+        for (uint256 i = 0; i < featureIds.length; i++) {
+            allFeatures[i] = features[featureIds[i]];
+        }
+        return allFeatures;
+    }
+
+    // Get a specific feature by ID
+    function getFeature(string memory featureId) public view returns (Feature memory) {
+        require(bytes(features[featureId].featureId).length > 0, "Feature does not exist");
+        return features[featureId];
+    }
+
     // ===== Plan Management =====
-    function createPlan(string memory name, uint256 amountInUsd) public onlyOwner {
+    function createPlan(string memory name, uint256 amountInUsd, string[] memory planFeatureIds) public onlyOwner {
         require(plans[name].amountPerMonth == 0, "Plan already exists");
         uint256 amountPerMonth = amountInUsd * 1e18;
-        plans[name] = Plan(name, amountPerMonth);
+        plans[name] = Plan(name, amountPerMonth, planFeatureIds);
         planNames.push(name);
-
         emit PlanCreated(name, amountPerMonth);
     }
 
     // ===== Subscription Functions =====
-    function subscribe(string memory planName) public payable {
+    function subscribe(string memory planName, uint8 durationOption, uint8 maxSlippage) public payable {
         Plan storage plan = plans[planName];
         require(plan.amountPerMonth > 0, "Plan does not exist");
+        require(durationOption == 1 || durationOption == 12, "Invalid duration");
 
-        uint256 requiredEth = getEthAmountFromUsd(plan.amountPerMonth);
-        require(msg.value == requiredEth, "Incorrect ETH amount sent");
+        uint256 usdAmount = plan.amountPerMonth * durationOption;
+        uint256 requiredEth = getEthAmountFromUsd(usdAmount);
+
+        // Slippage check
+        uint256 minEth = (requiredEth * (100 - maxSlippage)) / 100;
+        require(msg.value >= minEth, "ETH sent is below required min due to slippage");
 
         Subscription storage subscription = subscriptions[msg.sender][planName];
-        require(subscription.startTime == 0, "Already subscribed to this plan");
+        uint256 addedDuration = durationOption == 1 ? 30 days : 365 days;
 
-        subscription.subscriber = msg.sender;
-        subscription.planName = planName;
-        subscription.amountPaid = msg.value;
-        subscription.startTime = block.timestamp;
-        subscription.duration = 30 days;
+        if (subscription.startTime != 0) {
+            uint256 timeElapsed = block.timestamp - subscription.startTime;
+            uint256 timeLeft = subscription.duration > timeElapsed ? subscription.duration - timeElapsed : 0;
+            subscription.startTime = block.timestamp;
+            subscription.amountPaid += msg.value;
+            subscription.duration = timeLeft + addedDuration;
+        } else {
+            subscription.subscriber = msg.sender;
+            subscription.planName = planName;
+            subscription.amountPaid = msg.value;
+            subscription.startTime = block.timestamp;
+            subscription.duration = addedDuration;
+        }
 
         emit Subscribed(msg.sender, planName, msg.value);
     }
@@ -127,6 +174,20 @@ contract EtherSub {
         emit Cancelled(msg.sender, planName, refundAmount);
     }
 
+    //auto cleanup if plan duration is over 
+    function autoCleanup() public {
+        for (uint256 i = 0; i < planNames.length; i++) {
+            string memory planName = planNames[i];
+            Subscription storage subscription = subscriptions[msg.sender][planName];
+            if (subscription.startTime != 0) {
+                uint256 timeElapsed = block.timestamp - subscription.startTime;
+                if (timeElapsed >= subscription.duration) {
+                    delete subscriptions[msg.sender][planName];
+                }
+            }
+        }
+    }
+
     // ===== Utility Functions =====
     function viewPlans() public view returns (Plan[] memory) {
         uint256 count = 0;
@@ -147,6 +208,94 @@ contract EtherSub {
 
         return allPlans;
     }
+
+    // Add these functions to your EtherSub contract for better frontend integration
+
+// Get subscription status without reverting (frontend-friendly)
+function getSubscriptionStatus(address user, string memory planName) 
+    public view returns (bool active, uint256 timeLeft, uint256 amountPaid) 
+{
+    Subscription storage subscription = subscriptions[user][planName];
+    if (subscription.startTime == 0) {
+        return (false, 0, 0);
+    }
+    
+    uint256 timeElapsed = block.timestamp - subscription.startTime;
+    timeLeft = subscription.duration > timeElapsed ? subscription.duration - timeElapsed : 0;
+    active = timeLeft > 0;
+    amountPaid = subscription.amountPaid;
+}
+
+// Get required ETH for a plan with current prices (frontend helper)
+function getSubscriptionCost(string memory planName, uint8 duration) 
+    public view returns (uint256 ethCost, uint256 usdCost) 
+{
+    Plan storage plan = plans[planName];
+    require(plan.amountPerMonth > 0, "Plan does not exist");
+    require(duration == 1 || duration == 12, "Invalid duration");
+    
+    usdCost = plan.amountPerMonth * duration;
+    ethCost = getEthAmountFromUsd(usdCost);
+}
+
+// Check if user has any active subscriptions (useful for dashboard)
+function hasActiveSubscription(address user) public view returns (bool) {
+    for (uint256 i = 0; i < planNames.length; i++) {
+        (bool active,,) = getSubscriptionStatus(user, planNames[i]);
+        if (active) return true;
+    }
+    return false;
+}
+
+// Get all active subscriptions for a user (dashboard helper)
+function getUserActiveSubscriptions(address user) 
+    public view returns (string[] memory activePlanNames, uint256[] memory timesLeft) 
+{
+    // First count active subscriptions
+    uint256 activeCount = 0;
+    for (uint256 i = 0; i < planNames.length; i++) {
+        (bool active,,) = getSubscriptionStatus(user, planNames[i]);
+        if (active) activeCount++;
+    }
+    
+    // Create arrays with correct size
+    activePlanNames = new string[](activeCount);
+    timesLeft = new uint256[](activeCount);
+    
+    // Fill arrays
+    uint256 index = 0;
+    for (uint256 i = 0; i < planNames.length; i++) {
+        (bool active, uint256 timeLeft,) = getSubscriptionStatus(user, planNames[i]);
+        if (active) {
+            activePlanNames[index] = planNames[i];
+            timesLeft[index] = timeLeft;
+            index++;
+        }
+    }
+}
+
+// Get plan with features details (comprehensive plan info)
+function getPlanDetails(string memory planName) 
+    public view returns (
+        string memory name,
+        uint256 amountPerMonth,
+        string[] memory featureIds,
+        EtherSub.Feature[] memory planFeatures
+    ) 
+{
+    Plan storage plan = plans[planName];
+    require(plan.amountPerMonth > 0, "Plan does not exist");
+    
+    name = plan.name;
+    amountPerMonth = plan.amountPerMonth;
+    featureIds = plan.allowedFeatures;
+    
+    // Get full feature details
+    planFeatures = new Feature[](featureIds.length);
+    for (uint256 i = 0; i < featureIds.length; i++) {
+        planFeatures[i] = features[featureIds[i]];
+    }
+}
 
     // ===== Owner-only Withdraw =====
     function withdraw() public onlyOwner noReentrancy {
