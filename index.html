@@ -1,0 +1,755 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EtherSub - Decentralized Subscriptions</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/ethers/6.7.1/ethers.umd.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(135deg, #0f0f23 0%, #1a1a3e 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .header h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            margin-bottom: 10px;
+        }
+
+        .header p {
+            font-size: 1.2rem;
+            color: #a0a0a0;
+        }
+
+        .wallet-section {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .wallet-btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            color: white;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+        }
+
+        .wallet-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+
+        .wallet-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .wallet-info {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .tabs {
+            display: flex;
+            justify-content: center;
+            margin-bottom: 40px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            padding: 5px;
+            backdrop-filter: blur(10px);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        .tab {
+            flex: 1;
+            padding: 15px;
+            text-align: center;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            font-weight: 600;
+        }
+
+        .tab.active {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+        }
+
+        .plans-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-bottom: 40px;
+        }
+
+        .plan-card {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            transition: all 0.3s ease;
+        }
+
+        .plan-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+
+        .plan-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #667eea;
+        }
+
+        .plan-price {
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+
+        .plan-features {
+            list-style: none;
+            margin-bottom: 30px;
+        }
+
+        .plan-features li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .plan-features li:before {
+            content: "✓";
+            color: #4ade80;
+            font-weight: bold;
+            margin-right: 10px;
+        }
+
+        .subscribe-section {
+            margin-top: 20px;
+        }
+
+        .duration-options {
+            display: flex;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        .duration-btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: transparent;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            position: relative;
+        }
+
+        .duration-btn.active {
+            border-color: #667eea;
+            background: rgba(102, 126, 234, 0.2);
+        }
+
+        .discount-badge {
+            position: absolute;
+            top: -8px;
+            right: -8px;
+            background: #f59e0b;
+            color: white;
+            font-size: 0.7rem;
+            padding: 2px 6px;
+            border-radius: 8px;
+            font-weight: 600;
+        }
+
+        .action-btn {
+            width: 100%;
+            padding: 15px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+        }
+
+        .subscribe-btn {
+            background: linear-gradient(135deg, #4ade80 0%, #22c55e 100%);
+            color: white;
+        }
+
+        .cancel-btn {
+            background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            color: white;
+        }
+
+        .action-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.3);
+        }
+
+        .action-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .subscription-status {
+            margin-top: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            text-align: center;
+        }
+
+        .status-active {
+            background: rgba(74, 222, 128, 0.2);
+            border: 1px solid #4ade80;
+        }
+
+        .status-inactive {
+            background: rgba(239, 68, 68, 0.2);
+            border: 1px solid #ef4444;
+        }
+
+        .dashboard {
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 20px;
+            padding: 30px;
+            backdrop-filter: blur(10px);
+        }
+
+        .dashboard h2 {
+            margin-bottom: 20px;
+            color: #667eea;
+        }
+
+        .subscription-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 15px;
+            margin-bottom: 15px;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 10px;
+        }
+
+        .loading {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #667eea;
+            animation: spin 1s ease-in-out infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .error {
+            color: #ef4444;
+            text-align: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(239, 68, 68, 0.1);
+            border-radius: 10px;
+        }
+
+        .success {
+            color: #4ade80;
+            text-align: center;
+            padding: 15px;
+            margin: 10px 0;
+            background: rgba(74, 222, 128, 0.1);
+            border-radius: 10px;
+        }
+
+        .slippage-input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 15px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            font-size: 1rem;
+        }
+
+        .slippage-input::placeholder {
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .plans-grid {
+                grid-template-columns: 1fr;
+            }
+            
+            .tabs {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1><i class="fas fa-rocket"></i> EtherSub</h1>
+            <p>Decentralized subscription management on Ethereum</p>
+        </div>
+
+        <div class="wallet-section">
+            <button id="connectWallet" class="wallet-btn">
+                <i class="fas fa-wallet"></i> Connect Wallet
+            </button>
+            <div id="walletInfo" class="wallet-info" style="display: none;">
+                <p><strong>Connected:</strong> <span id="walletAddress"></span></p>
+                <p><strong>Network:</strong> <span id="networkName"></span></p>
+            </div>
+        </div>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="plans">
+                <i class="fas fa-list"></i> Plans
+            </div>
+            <div class="tab" data-tab="dashboard">
+                <i class="fas fa-tachometer-alt"></i> Dashboard
+            </div>
+        </div>
+
+        <div id="plans" class="tab-content active">
+            <div class="plans-grid" id="plansGrid">
+                <!-- Plans will be loaded here -->
+            </div>
+        </div>
+
+        <div id="dashboard" class="tab-content">
+            <div class="dashboard">
+                <h2><i class="fas fa-user-circle"></i> My Subscriptions</h2>
+                <div id="subscriptionsList">
+                    <!-- User subscriptions will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Contract configuration
+        const CONTRACT_ADDRESS = "YOUR_CONTRACT_ADDRESS_HERE"; // Replace with your deployed contract address
+        const CONTRACT_ABI = [
+            // Add your contract ABI here - this is a simplified version
+            "function viewPlans() external view returns (tuple(string name, uint256 amountPerMonth, string[] allowedFeatures)[])",
+            "function subscribe(string memory planName, uint8 durationOption, uint8 maxSlippage) external payable",
+            "function getSubscriptionCost(string memory planName, uint8 duration) external view returns (uint256 ethCost, uint256 usdCost, uint256 discount)",
+            "function getUserActiveSubscriptions(address user) external view returns (string[] memory activePlanNames, uint256[] memory timesLeft)",
+            "function cancelSubscription(string memory planName) external",
+            "function getSubscriptionStatus(address user, string memory planName) external view returns (bool active, uint256 timeLeft, uint256 amountPaid)",
+            "function getPlanDetails(string memory planName) external view returns (string memory name, uint256 amountPerMonth, string[] memory featureIds, tuple(string featureId, string name, string description)[] memory planFeatures)"
+        ];
+
+        let provider, signer, contract, userAddress;
+
+        // Initialize the app
+        async function init() {
+            setupEventListeners();
+            if (window.ethereum) {
+                await checkConnection();
+            }
+        }
+
+        function setupEventListeners() {
+            document.getElementById('connectWallet').addEventListener('click', connectWallet);
+            
+            // Tab switching
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => switchTab(tab.dataset.tab));
+            });
+        }
+
+        async function connectWallet() {
+            if (typeof window.ethereum !== 'undefined') {
+                try {
+                    await window.ethereum.request({ method: 'eth_requestAccounts' });
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                    signer = await provider.getSigner();
+                    userAddress = await signer.getAddress();
+                    contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+                    updateWalletUI();
+                    await loadPlans();
+                    await loadUserSubscriptions();
+                } catch (error) {
+                    showError('Failed to connect wallet: ' + error.message);
+                }
+            } else {
+                showError('Please install MetaMask to use this application');
+            }
+        }
+
+        async function checkConnection() {
+            try {
+                const accounts = await window.ethereum.request({ method: 'eth_accounts' });
+                if (accounts.length > 0) {
+                    provider = new ethers.BrowserProvider(window.ethereum);
+                    signer = await provider.getSigner();
+                    userAddress = await signer.getAddress();
+                    contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+                    
+                    updateWalletUI();
+                    await loadPlans();
+                    await loadUserSubscriptions();
+                }
+            } catch (error) {
+                console.error('Error checking connection:', error);
+            }
+        }
+
+        async function updateWalletUI() {
+            document.getElementById('connectWallet').textContent = 'Connected';
+            document.getElementById('connectWallet').disabled = true;
+            document.getElementById('walletAddress').textContent = 
+                userAddress.slice(0, 6) + '...' + userAddress.slice(-4);
+            
+            const network = await provider.getNetwork();
+            document.getElementById('networkName').textContent = network.name;
+            document.getElementById('walletInfo').style.display = 'block';
+        }
+
+        async function loadPlans() {
+            if (!contract) return;
+
+            try {
+                const plans = await contract.viewPlans();
+                const plansGrid = document.getElementById('plansGrid');
+                plansGrid.innerHTML = '';
+
+                for (const plan of plans) {
+                    const planCard = await createPlanCard(plan);
+                    plansGrid.appendChild(planCard);
+                }
+            } catch (error) {
+                showError('Failed to load plans: ' + error.message);
+            }
+        }
+
+        async function createPlanCard(plan) {
+            const card = document.createElement('div');
+            card.className = 'plan-card';
+
+            // Get plan details with features
+            let planDetails;
+            try {
+                planDetails = await contract.getPlanDetails(plan.name);
+            } catch (error) {
+                console.error('Error loading plan details:', error);
+                planDetails = { planFeatures: [] };
+            }
+
+            // Convert price from wei to USD (assuming 18 decimals)
+            const monthlyPriceUSD = Number(ethers.formatEther(plan.amountPerMonth));
+
+            card.innerHTML = `
+                <div class="plan-name">${plan.name}</div>
+                <div class="plan-price">$${monthlyPriceUSD.toFixed(2)}/month</div>
+                <ul class="plan-features">
+                    ${planDetails.planFeatures.map(feature => 
+                        `<li>${feature.name}: ${feature.description}</li>`
+                    ).join('')}
+                </ul>
+                <div class="subscribe-section">
+                    <div class="duration-options">
+                        <button class="duration-btn active" data-duration="1" data-plan="${plan.name}">
+                            1 Month
+                        </button>
+                        <button class="duration-btn" data-duration="12" data-plan="${plan.name}">
+                            12 Months
+                            <div class="discount-badge">10% OFF</div>
+                        </button>
+                    </div>
+                    <input type="number" class="slippage-input" placeholder="Max Slippage % (default: 5)" 
+                           value="5" min="1" max="50" id="slippage-${plan.name}">
+                    <button class="action-btn subscribe-btn" onclick="subscribeToPlan('${plan.name}')">
+                        <i class="fas fa-credit-card"></i> Subscribe
+                    </button>
+                    <button class="action-btn cancel-btn" onclick="cancelPlan('${plan.name}')" style="display: none;">
+                        <i class="fas fa-times"></i> Cancel Subscription
+                    </button>
+                    <div class="subscription-status" id="status-${plan.name}" style="display: none;"></div>
+                </div>
+            `;
+
+            // Setup duration button handlers
+            const durationBtns = card.querySelectorAll('.duration-btn');
+            durationBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    durationBtns.forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    updatePriceDisplay(plan.name, btn.dataset.duration);
+                });
+            });
+
+            // Check subscription status
+            if (userAddress) {
+                checkSubscriptionStatus(plan.name, card);
+            }
+
+            return card;
+        }
+
+        async function updatePriceDisplay(planName, duration) {
+            try {
+                const cost = await contract.getSubscriptionCost(planName, duration);
+                const ethCost = ethers.formatEther(cost.ethCost);
+                const usdCost = ethers.formatEther(cost.usdCost);
+                
+                // Update price display in the card
+                // This could be enhanced to show real-time pricing
+            } catch (error) {
+                console.error('Error updating price:', error);
+            }
+        }
+
+        async function subscribeToPlan(planName) {
+            if (!contract) {
+                showError('Please connect your wallet first');
+                return;
+            }
+
+            try {
+                const card = document.querySelector(`[data-plan="${planName}"]`).closest('.plan-card');
+                const activeDurationBtn = card.querySelector('.duration-btn.active');
+                const duration = parseInt(activeDurationBtn.dataset.duration);
+                const slippage = parseInt(document.getElementById(`slippage-${planName}`).value) || 5;
+
+                // Get subscription cost
+                const cost = await contract.getSubscriptionCost(planName, duration);
+                const ethCost = cost.ethCost;
+
+                // Show loading
+                const subscribeBtn = card.querySelector('.subscribe-btn');
+                const originalText = subscribeBtn.innerHTML;
+                subscribeBtn.innerHTML = '<div class="loading"></div> Processing...';
+                subscribeBtn.disabled = true;
+
+                // Execute transaction
+                const tx = await contract.subscribe(planName, duration, slippage, {
+                    value: ethCost
+                });
+
+                showSuccess(`Transaction submitted! Hash: ${tx.hash}`);
+                await tx.wait();
+                showSuccess('Subscription successful!');
+
+                // Refresh status
+                await checkSubscriptionStatus(planName, card);
+                await loadUserSubscriptions();
+
+            } catch (error) {
+                showError('Subscription failed: ' + error.message);
+            } finally {
+                // Reset button
+                setTimeout(() => {
+                    const subscribeBtn = document.querySelector(`[data-plan="${planName}"]`).closest('.plan-card').querySelector('.subscribe-btn');
+                    subscribeBtn.innerHTML = '<i class="fas fa-credit-card"></i> Subscribe';
+                    subscribeBtn.disabled = false;
+                }, 2000);
+            }
+        }
+
+        async function cancelPlan(planName) {
+            if (!contract) return;
+
+            try {
+                const tx = await contract.cancelSubscription(planName);
+                showSuccess('Cancellation submitted!');
+                await tx.wait();
+                showSuccess('Subscription cancelled successfully!');
+                
+                // Refresh UI
+                const card = document.querySelector(`[data-plan="${planName}"]`).closest('.plan-card');
+                await checkSubscriptionStatus(planName, card);
+                await loadUserSubscriptions();
+            } catch (error) {
+                showError('Cancellation failed: ' + error.message);
+            }
+        }
+
+        async function checkSubscriptionStatus(planName, card) {
+            if (!contract || !userAddress) return;
+
+            try {
+                const status = await contract.getSubscriptionStatus(userAddress, planName);
+                const subscribeBtn = card.querySelector('.subscribe-btn');
+                const cancelBtn = card.querySelector('.cancel-btn');
+                const statusDiv = card.querySelector(`#status-${planName}`);
+
+                if (status.active) {
+                    const timeLeft = Number(status.timeLeft);
+                    const days = Math.floor(timeLeft / (24 * 60 * 60));
+                    
+                    subscribeBtn.style.display = 'none';
+                    cancelBtn.style.display = 'block';
+                    statusDiv.style.display = 'block';
+                    statusDiv.className = 'subscription-status status-active';
+                    statusDiv.innerHTML = `<i class="fas fa-check-circle"></i> Active - ${days} days remaining`;
+                } else {
+                    subscribeBtn.style.display = 'block';
+                    cancelBtn.style.display = 'none';
+                    statusDiv.style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error checking subscription status:', error);
+            }
+        }
+
+        async function loadUserSubscriptions() {
+            if (!contract || !userAddress) return;
+
+            try {
+                const subscriptions = await contract.getUserActiveSubscriptions(userAddress);
+                const subscriptionsList = document.getElementById('subscriptionsList');
+                
+                if (subscriptions.activePlanNames.length === 0) {
+                    subscriptionsList.innerHTML = '<p>No active subscriptions found.</p>';
+                    return;
+                }
+
+                subscriptionsList.innerHTML = '';
+                for (let i = 0; i < subscriptions.activePlanNames.length; i++) {
+                    const planName = subscriptions.activePlanNames[i];
+                    const timeLeft = Number(subscriptions.timesLeft[i]);
+                    const days = Math.floor(timeLeft / (24 * 60 * 60));
+
+                    const item = document.createElement('div');
+                    item.className = 'subscription-item';
+                    item.innerHTML = `
+                        <div>
+                            <strong>${planName}</strong>
+                            <div style="color: #a0a0a0; font-size: 0.9rem;">${days} days remaining</div>
+                        </div>
+                        <button class="action-btn cancel-btn" onclick="cancelPlan('${planName}')" style="width: auto; padding: 8px 15px;">
+                            Cancel
+                        </button>
+                    `;
+                    subscriptionsList.appendChild(item);
+                }
+            } catch (error) {
+                console.error('Error loading user subscriptions:', error);
+                document.getElementById('subscriptionsList').innerHTML = 
+                    '<p style="color: #ef4444;">Error loading subscriptions</p>';
+            }
+        }
+
+        function switchTab(tabName) {
+            // Update tab buttons
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.classList.remove('active');
+            });
+            document.querySelector(`[data-tab="${tabName}"]`).classList.add('active');
+
+            // Update tab content
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+            document.getElementById(tabName).classList.add('active');
+
+            // Load data for the active tab
+            if (tabName === 'dashboard') {
+                loadUserSubscriptions();
+            }
+        }
+
+        function showError(message) {
+            // Remove existing messages
+            document.querySelectorAll('.error, .success').forEach(el => el.remove());
+            
+            const errorDiv = document.createElement('div');
+            errorDiv.className = 'error';
+            errorDiv.innerHTML = `<i class="fas fa-exclamation-triangle"></i> ${message}`;
+            document.querySelector('.container').insertBefore(errorDiv, document.querySelector('.tabs'));
+            
+            setTimeout(() => errorDiv.remove(), 5000);
+        }
+
+        function showSuccess(message) {
+            // Remove existing messages
+            document.querySelectorAll('.error, .success').forEach(el => el.remove());
+            
+            const successDiv = document.createElement('div');
+            successDiv.className = 'success';
+            successDiv.innerHTML = `<i class="fas fa-check-circle"></i> ${message}`;
+            document.querySelector('.container').insertBefore(successDiv, document.querySelector('.tabs'));
+            
+            setTimeout(() => successDiv.remove(), 5000);
+        }
+
+        // Initialize app when DOM is loaded
+        document.addEventListener('DOMContentLoaded', init);
+
+        // Handle account changes
+        if (window.ethereum) {
+            window.ethereum.on('accountsChanged', (accounts) => {
+                if (accounts.length === 0) {
+                    location.reload();
+                } else {
+                    init();
+                }
+            });
+
+            window.ethereum.on('chainChanged', () => {
+                location.reload();
+            });
+        }
+    </script>
+</body>
+</html>

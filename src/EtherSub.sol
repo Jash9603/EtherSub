@@ -116,36 +116,42 @@ contract EtherSub {
 
     // ===== Subscription Functions =====
     function subscribe(string memory planName, uint8 durationOption, uint8 maxSlippage) public payable {
-        Plan storage plan = plans[planName];
-        require(plan.amountPerMonth > 0, "Plan does not exist");
-        require(durationOption == 1 || durationOption == 12, "Invalid duration");
+    Plan storage plan = plans[planName];
+    require(plan.amountPerMonth > 0, "Plan does not exist");
+    require(durationOption == 1 || durationOption == 12, "Invalid duration");
 
-        uint256 usdAmount = plan.amountPerMonth * durationOption;
-        uint256 requiredEth = getEthAmountFromUsd(usdAmount);
-
-        // Slippage check
-        uint256 minEth = (requiredEth * (100 - maxSlippage)) / 100;
-        require(msg.value >= minEth, "ETH sent is below required min due to slippage");
-
-        Subscription storage subscription = subscriptions[msg.sender][planName];
-        uint256 addedDuration = durationOption == 1 ? 30 days : 365 days;
-
-        if (subscription.startTime != 0) {
-            uint256 timeElapsed = block.timestamp - subscription.startTime;
-            uint256 timeLeft = subscription.duration > timeElapsed ? subscription.duration - timeElapsed : 0;
-            subscription.startTime = block.timestamp;
-            subscription.amountPaid += msg.value;
-            subscription.duration = timeLeft + addedDuration;
-        } else {
-            subscription.subscriber = msg.sender;
-            subscription.planName = planName;
-            subscription.amountPaid = msg.value;
-            subscription.startTime = block.timestamp;
-            subscription.duration = addedDuration;
-        }
-
-        emit Subscribed(msg.sender, planName, msg.value);
+    uint256 usdAmount = plan.amountPerMonth * durationOption;
+    
+    // Apply 10% discount for 12-month subscriptions
+    if (durationOption == 12) {
+        usdAmount = (usdAmount * 90) / 100; // 10% discount
     }
+    
+    uint256 requiredEth = getEthAmountFromUsd(usdAmount);
+
+    // Slippage check
+    uint256 minEth = (requiredEth * (100 - maxSlippage)) / 100;
+    require(msg.value >= minEth, "ETH sent is below required min due to slippage");
+
+    Subscription storage subscription = subscriptions[msg.sender][planName];
+    uint256 addedDuration = durationOption == 1 ? 30 days : 365 days;
+
+    if (subscription.startTime != 0) {
+        uint256 timeElapsed = block.timestamp - subscription.startTime;
+        uint256 timeLeft = subscription.duration > timeElapsed ? subscription.duration - timeElapsed : 0;
+        subscription.startTime = block.timestamp;
+        subscription.amountPaid += msg.value;
+        subscription.duration = timeLeft + addedDuration;
+    } else {
+        subscription.subscriber = msg.sender;
+        subscription.planName = planName;
+        subscription.amountPaid = msg.value;
+        subscription.startTime = block.timestamp;
+        subscription.duration = addedDuration;
+    }
+
+    emit Subscribed(msg.sender, planName, msg.value);
+}
 
     function checkSubscription(string memory planName) public view returns (Subscription memory, uint256 timeLeft) {
         Subscription storage subscription = subscriptions[msg.sender][planName];
