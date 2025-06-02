@@ -14,7 +14,7 @@ A decentralized funding platform built with Solidity and Foundry, allowing users
 ## 📋 Prerequisites
 
 - [Foundry](https://book.getfoundry.sh/getting-started/installation)
-- [Node.js](https://nodejs.org/) (for development)
+- [React.js](https://react.dev/) (for development)
 - An Ethereum wallet with testnet ETH
 - Chainlink Price Feed address for your network
 
