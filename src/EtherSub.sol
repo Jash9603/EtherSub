@@ -241,6 +241,9 @@ function getSubscriptionCost(string memory planName, uint8 duration)
     require(duration == 1 || duration == 12, "Invalid duration");
     
     usdCost = plan.amountPerMonth * duration;
+    if(duration == 12) {
+        usdCost = (usdCost * 90) / 100; // Apply 10% discount for 12-month subscriptions
+    }
     ethCost = getEthAmountFromUsd(usdCost);
 }
 

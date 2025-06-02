@@ -15,8 +15,8 @@ docs/
 # Dotenv file
 .env
 
+MakeFile
 
 .github/
 # Ignore all files in the .github directory
 # except for the workflows directory
-
